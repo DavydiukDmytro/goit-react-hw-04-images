@@ -46,7 +46,7 @@ export const App = () => {
       return;
     }
     featchImages(search, page);
-  }, [search, page]);
+  }, [search, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const featchImages = async (search, page) => {
     try {
