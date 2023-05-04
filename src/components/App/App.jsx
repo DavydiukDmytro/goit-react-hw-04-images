@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getImages } from 'services/api';
 import { Searchbar } from 'components/Searchbar';
 import { ImageGallery } from 'components/ImageGallery';
@@ -14,108 +14,102 @@ const Status = {
   REJECTED: 'rejected',
 };
 
-export class App extends Component {
-  state = {
-    search: '',
-    images: [],
-    totalHits: 0,
-    page: 1,
-    error: `We didn't find anything`,
-    isButtonLoad: false,
-    loader: false,
-    status: Status.IDLE,
+export const App = () => {
+  const [search, setSearch] = useState('');
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState(`We didn't find anything`);
+  const [isButtonLoad, setIsButtonLoad] = useState(false);
+  const [loader, setLoader] = useState(true);
+  const [status, setStatus] = useState(Status.IDLE);
+  const isFirstRender = useRef(true);
+
+  const handleSearch = searchWord => {
+    scroll();
+    setImages([]);
+    setPage(1);
+    setIsButtonLoad(false);
+    setError(`We didn't find anything`);
+    setStatus(Status.PENDING);
+    setSearch(searchWord.trim());
   };
 
-  async componentDidUpdate(prevProp, prevState) {
-    const { search, page } = this.state;
-    if (prevState.search !== search || prevState.page !== page) {
-      this.featchImages(search, page);
-    }
-  }
+  const onClickLoad = () => {
+    setLoader(true);
+    setIsButtonLoad(false);
+    setPage(prevS => prevS + 1);
+  };
 
-  featchImages = async (search, page) => {
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    featchImages(search, page);
+  }, [search, page]);
+
+  const featchImages = async (search, page) => {
     try {
       const response = await getImages(search, page);
       const { hits, totalHits } = response;
       if (hits.length === 0) {
-        return this.setState({ status: Status.REJECTED });
+        return setStatus(Status.REJECTED);
       }
-      const countLoadedPhotos = hits.length + this.state.images.length;
+      const countLoadedPhotos = hits.length + images.length;
       if (countLoadedPhotos < totalHits) {
-        this.setState({ isButtonLoad: true });
+        setIsButtonLoad(true);
       } else {
-        this.setState({ isButtonLoad: false });
+        setIsButtonLoad(false);
       }
-      this.setState(prevS => ({
-        images: [...prevS.images, ...hits],
-        totalHits: totalHits,
-        status: Status.RESOLVED,
-      }));
+      setImages(prevS => [...prevS, ...hits]);
+      setStatus(Status.RESOLVED);
+      setLoader(false);
     } catch (error) {
-      this.setState({ error: error.message, status: Status.REJECTED });
+      setError(error.message);
+      setStatus(Status.REJECTED);
     }
   };
 
-  handleSearch = searchWord => {
-    scroll();
-    this.setState({
-      images: [],
-      search: searchWord.trim(),
-      page: 1,
-      status: Status.PENDING,
-      isButtonLoad: false,
-      error: `We didn't find anything`,
-    });
-  };
-
-  onClickLoad = async () => {
-    this.setState(prevS => ({ page: prevS.page + 1 }));
-  };
-
-  render() {
-    const { status, images, isButtonLoad, loader } = this.state;
-    const { handleSearch, onClickLoad } = this;
-    return (
-      <Container>
-        <Searchbar onSubmit={handleSearch} />
-        {status === 'idle' && <Text>Enter a keyword and click search</Text>}
-        {status === 'resolved' && (
-          <>
-            <ImageGallery images={images} />
-            {loader && (
-              <ThreeDots
-                height="80"
-                width="80"
-                radius="9"
-                color="#9fa9b5"
-                ariaLabel="three-dots-loading"
-                wrapperStyle={{ marginLeft: 'auto', marginRight: 'auto' }}
-                wrapperClassName=""
-                visible={true}
-              />
-            )}
-          </>
-        )}
-        {status === 'pending' && (
-          <MagnifyingGlass
-            visible={true}
-            height="200"
-            width="200"
-            ariaLabel="MagnifyingGlass-loading"
-            wrapperStyle={{ marginLeft: 'auto', marginRight: 'auto' }}
-            wrapperClass="MagnifyingGlass-wrapper"
-            glassColor="#fff"
-            color="#9fa9b5"
-          />
-        )}
-        {status === 'rejected' && (
-          <>
-            <Text>Sorry something went wrong!</Text>
-            <Text>Error: {this.state.error}</Text>
-          </>
-        )}
-        {isButtonLoad && <Button onClickLoad={onClickLoad} />}
-      </Container>
-    );
-  }
-}
+  return (
+    <Container>
+      <Searchbar onSubmit={handleSearch} />
+      {status === 'idle' && <Text>Enter a keyword and click search</Text>}
+      {status === 'resolved' && (
+        <>
+          <ImageGallery images={images} />
+          {loader && (
+            <ThreeDots
+              height="80"
+              width="80"
+              radius="9"
+              color="#9fa9b5"
+              ariaLabel="three-dots-loading"
+              wrapperStyle={{ marginLeft: 'auto', marginRight: 'auto' }}
+              wrapperClassName=""
+              visible={true}
+            />
+          )}
+        </>
+      )}
+      {status === 'pending' && (
+        <MagnifyingGlass
+          visible={true}
+          height="200"
+          width="200"
+          ariaLabel="MagnifyingGlass-loading"
+          wrapperStyle={{ marginLeft: 'auto', marginRight: 'auto' }}
+          wrapperClass="MagnifyingGlass-wrapper"
+          glassColor="#fff"
+          color="#9fa9b5"
+        />
+      )}
+      {status === 'rejected' && (
+        <>
+          <Text>Sorry something went wrong!</Text>
+          <Text>Error: {error}</Text>
+        </>
+      )}
+      {isButtonLoad && <Button onClickLoad={onClickLoad} />}
+    </Container>
+  );
+};
